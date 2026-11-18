@@ -80,16 +80,47 @@ phone app first and drive the dog with the handheld controller.
 
 ### AES key (Go2 firmware 1.1.15 and newer)
 
-Newer firmware requires a per-robot key from your Unitree account. Fetch it
-once while the Pi has internet:
+Newer firmware requires a per-robot key from your Unitree account (the same
+account the phone app uses). Do this once, while the Pi has internet (not on
+the robot's hotspot). The key is saved in `aes_key.txt`, which is git-ignored.
+
+**1. Apply the login fix** (needed for library v2.2.0, see
+[Key-fetch fix](#setup)):
+
+```bash
+sed -i 's/impersonate="chrome120"/impersonate="safari17_0"/' \
+  .venv/lib/python3.12/site-packages/unitree_webrtc_connect/unitree_cloud.py
+```
+
+**2. List your robots and their keys** (asks for your Unitree password):
 
 ```bash
 .venv/bin/python go2lidar.py --fetch-key --device-type Go2 --email YOUR_UNITREE_EMAIL
 ```
 
-Save the 32-character key in `aes_key.txt` in this folder (it is git-ignored).
-The server re-reads the file on every connection attempt, so no restart is
-needed.
+**3. Save the key for one robot** straight into `aes_key.txt`, using the
+serial number (SN) from step 2:
+
+```bash
+.venv/bin/python go2lidar.py --fetch-key --device-type Go2 --email YOUR_UNITREE_EMAIL \
+  --sn YOUR_ROBOT_SN -q > aes_key.txt
+```
+
+Or paste the 32-character key from step 2 by hand:
+
+```bash
+echo YOUR_32_CHARACTER_KEY > aes_key.txt
+```
+
+**4. Check it** (should print 32):
+
+```bash
+tr -d '\n' < aes_key.txt | wc -c
+```
+
+The server re-reads `aes_key.txt` on every connection attempt, so no restart
+is needed. You can also pass the key directly with `--key` or the
+`GO2_AES_KEY` environment variable.
 
 ## Setup
 
