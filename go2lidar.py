@@ -42,6 +42,8 @@ class State:
         self.seq = 0
         self.pose = (0.0, 0.0, 0.0, 0.0)  # x, y, z, yaw
         self.last_pose_time = 0.0
+        self.battery = None           # state of charge, %
+        self.battery_time = 0.0
         self.status = "starting"
         self.message = "Starting up..."
         self.last_frame_time = 0.0
@@ -120,6 +122,70 @@ class Camera:
 CAMERA = Camera()
 
 
+# ---------------------------------------------------------------- tricks
+# Gentle tricks only (no flips/jumps around kids). These api_ids are the same
+# in the classic and the newer MCF sport API, so they work on any firmware.
+TRICKS = [  # (key, button label, api_id)
+    ("hello",   "Hello / Shake", 1016),   # raises a front paw (the app's wave / handshake)
+    ("heart",   "Heart",     1036),       # "FingerHeart" in the classic API, "Heart" in MCF
+    ("stretch", "Stretch",   1017),
+    ("dance1",  "Dance 1",   1022),
+    ("dance2",  "Dance 2",   1023),
+    ("happy",   "Happy",     1020),
+    ("scrape",  "Scrape",    1029),
+    ("sit",     "Sit",       1009),
+    ("getup",   "Get up",    1010),
+    ("stand",   "Stand up",  1004),
+    ("lie",     "Lie down",  1005),
+    ("recover", "Recover",   1006),
+    ("stop",    "Stop",      1003),
+]
+TRICK_IDS = {k: api for k, _, api in TRICKS}
+SPORT_TOPIC = "rt/api/sport/request"
+
+
+class Robot:
+    """The live connection, so the web server can send commands to it."""
+    def __init__(self):
+        self.conn = None
+        self.loop = None
+        self.busy = threading.Lock()   # one trick at a time
+        self.enabled = True
+
+    def send_trick(self, key, timeout=6.0):
+        if not self.enabled:
+            return 403, {"ok": False, "error": "Tricks are turned off"}
+        if key not in TRICK_IDS:
+            return 400, {"ok": False, "error": "Unknown trick"}
+        conn, loop = self.conn, self.loop
+        if conn is None or loop is None:
+            return 503, {"ok": False, "error": "Robot not connected"}
+        # Stop always goes through, even while another trick is running.
+        if key != "stop" and not self.busy.acquire(blocking=False):
+            return 429, {"ok": False, "error": "Still doing the last trick"}
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                conn.datachannel.pub_sub.publish_request_new(
+                    SPORT_TOPIC, {"api_id": TRICK_IDS[key]}), loop)
+            try:
+                resp = fut.result(timeout=timeout)
+            except TimeoutError:
+                return 200, {"ok": True, "note": "sent"}   # long tricks reply late
+            code = (resp or {}).get("data", {}).get("header", {}).get("status", {}).get("code", 0)
+            if code != 0:
+                return 502, {"ok": False, "error": f"Robot said no (code {code})"}
+            return 200, {"ok": True}
+        except Exception as e:
+            log.warning("trick %s failed: %r", key, e)
+            return 500, {"ok": False, "error": str(e)[:80]}
+        finally:
+            if key != "stop":
+                self.busy.release()
+
+
+ROBOT = Robot()
+
+
 # ---------------------------------------------------------------- robot link
 def _stub_audio():
     """The robot library imports sounddevice for audio we don't use. If the
@@ -128,6 +194,21 @@ def _stub_audio():
         import sounddevice  # noqa: F401
     except Exception:
         sys.modules["sounddevice"] = types.ModuleType("sounddevice")
+
+
+def _quiet_library_prints():
+    """The library print()s connection-state lines on every attempt; send them
+    to the debug log instead (shown with -v)."""
+    import importlib
+    def quiet(status_type, status_message):
+        log.debug("%s: %s", status_type, status_message)
+    for name in ("util", "webrtc_driver", "webrtc_datachannel", "unitree_auth"):
+        try:
+            mod = importlib.import_module("unitree_webrtc_connect." + name)
+            if hasattr(mod, "print_status"):
+                mod.print_status = quiet
+        except Exception:
+            pass
 
 
 def _yaw_from_quat(q):
@@ -147,6 +228,7 @@ async def robot_loop(aes_key, ip=None):
     _stub_audio()
     from unitree_webrtc_connect.webrtc_driver import (
         UnitreeWebRTCConnection, WebRTCConnectionMethod)
+    _quiet_library_prints()
 
     attempt = 0
     while True:
@@ -185,6 +267,24 @@ async def robot_loop(aes_key, ip=None):
             conn.datachannel.pub_sub.subscribe("rt/utlidar/voxel_map_compressed", on_lidar)
             conn.datachannel.pub_sub.subscribe("rt/utlidar/robot_pose", on_pose)
 
+            seen_lowstate = []
+
+            def on_lowstate(msg):
+                if not seen_lowstate:   # log the first message's shape once, to debug the battery tile
+                    seen_lowstate.append(1)
+                    d = msg.get("data") if isinstance(msg, dict) else None
+                    log.info("battery data: first lowstate message, keys=%s bms=%s",
+                             list(d.keys())[:20] if isinstance(d, dict) else type(d).__name__,
+                             d.get("bms_state") if isinstance(d, dict) else None)
+                try:
+                    soc = msg["data"]["bms_state"]["soc"]
+                    with STATE.lock:
+                        STATE.battery, STATE.battery_time = int(soc), time.time()
+                except Exception as e:
+                    log.debug("bad lowstate: %s", e)
+
+            conn.datachannel.pub_sub.subscribe("rt/lf/lowstate", on_lowstate)
+
             # Front camera: grab frames as they arrive, hand them to the encoder.
             async def on_video(track):
                 while True:
@@ -194,22 +294,29 @@ async def robot_loop(aes_key, ip=None):
             conn.video.switchVideoChannel(True)
             conn.video.add_track_callback(on_video)
 
+            ROBOT.conn, ROBOT.loop = conn, asyncio.get_running_loop()
             STATE.set_status("connected", "Connected to the robot dog!")
             attempt = 0
 
             # Watchdog: if no LiDAR frames for 15 s, reconnect.
             STATE.last_frame_time = time.time()
+            connected_at = time.time()
             while True:
                 await asyncio.sleep(2)
+                if not seen_lowstate and time.time() - connected_at > 15:
+                    seen_lowstate.append(1)
+                    log.info("battery data: no lowstate messages after 15 s")
                 if time.time() - STATE.last_frame_time > 15:
+                    STATE.fps = 0.0
                     raise RuntimeError("no LiDAR data for 15 seconds")
         except Exception as e:
             if type(e).__name__ == "AesKeyRequiredError":
                 STATE.set_status("connecting", "Robot needs its AES key: save it in aes_key.txt")
             else:
                 STATE.set_status("connecting", f"Robot not connected ({str(e)[:80]}). Retrying...")
-            log.warning("connection problem: %r", e)
+            log.debug("connection problem: %r", e)   # status line above already says why
         finally:
+            ROBOT.conn = None
             if conn is not None:
                 try:
                     await asyncio.wait_for(conn.disconnect(), timeout=5)
@@ -237,6 +344,10 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.path.startswith("/tricks"):
+            body = json.dumps({"enabled": ROBOT.enabled,
+                               "tricks": [{"key": k, "label": l} for k, l, _ in TRICKS]}).encode()
+            return self._send(body, "application/json")
         if self.path.startswith("/frame"):
             with STATE.lock:
                 body, seq = STATE.frame, STATE.seq
@@ -250,11 +361,29 @@ class Handler(SimpleHTTPRequestHandler):
                     "stale": stale,
                     "camera": time.time() - CAMERA.last_time < 3,
                     "pose": time.time() - STATE.last_pose_time < 3,
+                    "battery": STATE.battery if time.time() - STATE.battery_time < 10 else None,
                 }).encode()
             return self._send(body, "application/json")
         if self.path.startswith("/camera.mjpg"):
             return self._mjpeg()
         return super().do_GET()
+
+    def do_POST(self):
+        if not self.path.startswith("/trick"):
+            self.send_error(404); return
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+            key = json.loads(self.rfile.read(min(n, 1024)) or b"{}").get("trick", "")
+        except (ValueError, AttributeError):
+            key = ""
+        status, result = ROBOT.send_trick(str(key))
+        log.info("trick %r -> %s %s", key, status, result)
+        body = json.dumps(result).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _mjpeg(self):
         self.send_response(200)
@@ -285,6 +414,7 @@ def main():
     ap.add_argument("--host", default="0.0.0.0",
                     help="0.0.0.0 lets other devices on the network watch too")
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--no-tricks", action="store_true", help="hide and disable the tricks panel")
     ap.add_argument("--fetch-key", nargs=argparse.REMAINDER,
                     help="get the AES key from your Unitree account (needs internet); "
                          "extra args go to unitree-fetch-aes-key")
@@ -296,14 +426,18 @@ def main():
         sys.argv = ["unitree-fetch-aes-key", *args.fetch_key]
         sys.exit(fetch_main())
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
+    # The robot library logs every data-channel message on the root logger,
+    # so the root stays at WARNING and only this app's own logger shows INFO.
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.WARNING,
                         format="%(asctime)s %(levelname)s %(message)s")
+    log.setLevel(logging.DEBUG if args.verbose else logging.INFO)
     if not args.verbose:
-        logging.getLogger("aioice").setLevel(logging.WARNING)
-        logging.getLogger("aiortc").setLevel(logging.WARNING)
+        logging.getLogger("aioice").setLevel(logging.ERROR)
+        logging.getLogger("aiortc").setLevel(logging.ERROR)   # hides H264 "failed to decode" noise
 
     key = args.key or _read_key_file()
 
+    ROBOT.enabled = not args.no_tricks
     threading.Thread(target=lambda: asyncio.run(robot_loop(key, args.ip)), daemon=True).start()
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)

@@ -16,7 +16,18 @@ shows:
 - **Two views:** an orbiting overview with a robot-dog marker, and a
   **Dog's eyes** POV that looks out from the robot's head
 - **Front camera feed** from the robot, swappable with the 3D view
-- Rotating "Did you know?" facts, dot count and scan rate
+- **Find yourself:** dots that just appeared (someone moving) turn white
+  while everything else dims, so kids can wave and spot themselves
+- **Distance ruler:** click any dot to see how far it is from the dog, in
+  meters, school rulers and big steps, plus how high it is
+- **Paw print trail** of where the dog walked, and **map memory** that keeps
+  everything the dog has seen in its height colours, so the room builds up as
+  it walks. The map stays current: spots in the area being scanned that are
+  no longer there are removed, and people walking past don't leave ghosts
+- **Battery gauge**, dot count and scan rate
+- **Display panel** to show or hide any part of the screen (saved between
+  visits), and **H** to hide everything except the 3D view
+- Rotating "Did you know?" facts
 
 Everything (including three.js) is served from the Pi, so it works on the
 robot's own Wi-Fi hotspot with no internet.
@@ -28,8 +39,8 @@ robot's own Wi-Fi hotspot with no internet.
 ./run.sh --ip 192.168.1.181    # STA mode: robot is on the same Wi-Fi as the Pi
 ```
 
-`run.sh` starts the server and opens Firefox in kiosk mode at
-`http://localhost:8080`. Close it with **Alt+F4**; the server stops with it.
+`run.sh` starts the server. Open `http://localhost:8080` in a browser
+(press **F** on the page for full screen). Stop the server with **Ctrl+C**.
 Other devices on the same network can watch at `http://<pi-ip>:8080`.
 
 ### Controls
@@ -40,7 +51,20 @@ Other devices on the same network can watch at `http://<pi-ip>:8080`.
 | **V** or top-bar buttons | Switch Overview / Dog's eyes |
 | **C** or click camera | Swap big camera / big 3D view |
 | **R** | Reset to the overview |
+| **T** or click "Tricks" | Open / close the tricks panel |
+| **Y** or "Find yourself" | Highlight things that just moved |
+| Click a dot | Measure its distance from the dog (**Esc** clears) |
+| **H** | Hide / show all on-screen panels |
 | **F** | Browser full screen |
+
+### Tricks
+
+A collapsible **Tricks** panel (top right, closed by default) sends gentle
+tricks: Hello / Shake, Heart, Stretch, Dance 1/2, Happy, Scrape, Sit, Get up, Stand up,
+Lie down, Recover, plus a **Stop** button that always goes through. Flips,
+jumps and handstands are deliberately left out. The server runs one trick at
+a time and only accepts tricks from this list. Start with `--no-tricks` to
+hide the panel and disable the endpoint.
 
 ## Connecting to the robot
 
@@ -100,7 +124,7 @@ Go2 ──WebRTC──> go2lidar.py ──HTTP──> browser (web/index.html)
 | `go2lidar.py` | Connects to the robot, decodes LiDAR and pose, encodes video, serves the page |
 | `web/index.html` | The viewer: three.js scene, overview and POV modes, UI |
 | `web/vendor/` | Bundled three.js r160 and OrbitControls (MIT) |
-| `run.sh` | Starts the server and opens Firefox in kiosk mode |
+| `run.sh` | Starts the server |
 
 **Firefox on the Pi:** Firefox renders WebGL but never puts a WebGL canvas on
 screen on this setup, so three.js draws off-screen and each frame is copied

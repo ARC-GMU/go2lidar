@@ -49,9 +49,20 @@
   .seg button + button { border-left: 1px solid var(--edge); }
   .seg button.on { background: var(--accent); color: #121418; }
   .right { display: flex; align-items: center; gap: 12px; }
-  .povnote { position: fixed; left: 50%; top: 96px; transform: translateX(-50%); z-index: 8;
-    background: var(--panel); border: 1px solid var(--wait); color: var(--ink); padding: 10px 16px;
-    font-size: clamp(14px, 1.2vw, 18px); font-weight: 600; }
+  .notes { position: fixed; left: 50%; top: 170px; transform: translateX(-50%); z-index: 8; max-width: 44vw;
+    display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+  .povnote { background: var(--panel); border: 1px solid var(--wait); color: var(--ink); padding: 10px 16px;
+    font-size: clamp(14px, 1.2vw, 18px); font-weight: 600; text-align: center; }
+  .povnote.find { border-color: #ffffff; }
+  .tog { font: 600 clamp(13px, 1.1vw, 16px) inherit; font-family: inherit; color: var(--muted);
+    background: var(--panel); border: 1px solid var(--edge); padding: 9px 16px; cursor: pointer; }
+  .tog.on { background: #ffffff; color: #121418; border-color: #ffffff; }
+  /* distance ruler label, pinned to the measured dot */
+  #ruler { position: absolute; z-index: 3; pointer-events: none; transform: translate(-50%, calc(-100% - 14px));
+    background: var(--panel); border: 1px solid var(--accent); padding: 10px 14px; min-width: 200px; text-align: center; }
+  #ruler .d { font-size: clamp(22px, 2.2vw, 32px); font-weight: 750; color: var(--accent); font-variant-numeric: tabular-nums; }
+  #ruler .c { font-size: clamp(13px, 1.1vw, 16px); margin-top: 4px; }
+  #ruler .h { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .card { position: fixed; background: var(--panel); border: 1px solid var(--edge); border-radius: 0; z-index: 6; }
   .card-head { padding: 12px 16px; border-bottom: 1px solid var(--edge); display: flex;
     align-items: center; justify-content: space-between; gap: 12px; }
@@ -73,7 +84,7 @@
   #cam { right: var(--gap); bottom: var(--gap); width: min(36vw, 640px); overflow: hidden; cursor: pointer; }
   #cam .frame { position: relative; aspect-ratio: 16 / 9; background: #000; }
   #cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
-  #cam .nocam { position: absolute; inset: 0; display: grid; place-items: center;
+  #cam .nocam { position: absolute; inset: 0; display: grid; place-items: center; background: #000;
     color: var(--muted); font-size: clamp(14px, 1.2vw, 18px); }
   .pill { font-size: 12px; font-weight: 600; color: var(--muted); padding: 3px 8px; border-radius: 0;
     border: 1px solid var(--edge); }
@@ -96,6 +107,46 @@
   kbd { font: 600 11px ui-monospace, monospace; color: var(--ink); background: var(--panel);
     border: 1px solid var(--edge); border-radius: 0; padding: 2px 6px; }
 
+  /* ---------- tricks panel (collapsed by default) ---------- */
+  .side { position: fixed; right: var(--gap); top: 124px; width: 300px; z-index: 9;
+    display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 140px); overflow-y: auto; }
+  .side > .card { position: static; }
+  .collapse-head { cursor: pointer; user-select: none; border-bottom: 0 !important; }
+  .card.open > .collapse-head { border-bottom: 1px solid var(--edge) !important; }
+  .collapse-head .toggle { font: 700 16px ui-monospace, monospace; color: var(--muted); }
+  /* display panel switches */
+  .opts { display: grid; gap: 2px; }
+  .opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 4px;
+    font-size: 14px; cursor: pointer; user-select: none; }
+  .opt input { appearance: none; width: 34px; height: 18px; margin: 0; background: var(--bg);
+    border: 1px solid var(--edge); position: relative; cursor: pointer; flex: none; }
+  .opt input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: var(--muted); }
+  .opt input:checked { background: var(--accent); border-color: var(--accent); }
+  .opt input:checked::after { left: 18px; background: #121418; }
+  .opt-sep { margin: 6px 0 2px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .wide { width: 100%; margin-top: 8px; }
+  .ui-off { display: none !important; }
+  body.clean [data-ui] { display: none !important; }
+  body.no-topbar #scene { top: 0; }
+  #showUi { position: fixed; left: 12px; bottom: 12px; z-index: 30; font: 600 12px inherit; font-family: inherit;
+    color: var(--muted); background: var(--panel); border: 1px solid var(--edge); padding: 6px 10px; cursor: pointer; opacity: 0.7; }
+  /* battery tile */
+  .batbar { display: grid; grid-template-columns: repeat(10, 6px); gap: 2px; margin-top: 4px; height: 8px; }
+  .batbar i { background: var(--edge); }
+  #tricks .card-head { cursor: pointer; user-select: none; border-bottom: 0; }
+  #tricks.open .card-head { border-bottom: 1px solid var(--edge); }
+  #tricks .toggle { font: 700 16px ui-monospace, monospace; color: var(--muted); }
+  #tricks .card-body { padding: 12px; }
+  .tgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tbtn { font: 600 14px inherit; font-family: inherit; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--edge); padding: 10px 4px; cursor: pointer; }
+  .tbtn:hover:not(:disabled) { border-color: var(--accent); }
+  .tbtn.sent { background: var(--accent); border-color: var(--accent); color: #121418; }
+  .tbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .tbtn.stop { grid-column: 1 / -1; margin-top: 6px; background: var(--bad); border-color: var(--bad);
+    color: #fff; font-size: 16px; padding: 12px; }
+  .tmsg { margin-top: 10px; min-height: 1.3em; font-size: 13px; color: var(--muted); }
+  .tmsg.err { color: var(--bad); }
   #err { position: fixed; top: 160px; left: var(--gap); right: var(--gap); padding: 10px 12px; background: #3a1517;
     border: 1px solid var(--bad); color: #fff; font: 13px ui-monospace, monospace; border-radius: 0; z-index: 20;
     white-space: pre-wrap; }
@@ -111,26 +162,49 @@
 </script>
 </head>
 <body>
-<div id="scene"></div>
+<div id="scene"><div id="ruler" hidden><div class="d" id="rulerD"></div><div class="c" id="rulerC"></div><div class="h" id="rulerH"></div></div></div>
 
-<div class="topbar">
+<div class="topbar" data-ui id="topbar">
   <div class="brand"><div class="mark"></div><h1>What the <em>Robot Dog</em> Sees</h1></div>
   <div class="right">
+    <button class="tog" id="findBtn" title="Highlight things that just moved (Y)">Find yourself</button>
     <div class="seg" id="viewSeg">
       <button data-mode="orbit" class="on">Overview</button><button data-mode="pov">Dog's eyes</button>
     </div>
     <div class="status connecting" id="status"><div class="dot"></div><span id="statusText">Starting</span></div>
   </div>
 </div>
-<div class="povnote" id="povNote" hidden>Waiting for the dog's position. Showing the view from where it started.</div>
-
-<div class="stats">
-  <div class="stat"><div class="n" id="nPoints">0</div><div class="l">Laser dots</div></div>
-  <div class="stat"><div class="n" id="nRate">0</div><div class="l">Scans / sec</div></div>
+<div class="notes" data-ui>
+  <div class="povnote" id="povNote" hidden>Waiting for the dog's position. Showing the view from where it started.</div>
+  <div class="povnote find" id="findNote" hidden>White dots are things that just moved. Wave at the dog and find yourself!</div>
 </div>
-<div class="keys"><kbd>Drag</kbd> spin <kbd>Scroll</kbd> zoom <kbd>V</kbd> view <kbd>C</kbd> camera <kbd>R</kbd> reset</div>
 
-<div class="card" id="info">
+<div class="stats" data-ui>
+  <div class="stat" id="statDots"><div class="n" id="nPoints">0</div><div class="l">Laser dots</div></div>
+  <div class="stat" id="statRate"><div class="n" id="nRate">0</div><div class="l">Scans / sec</div></div>
+  <div class="stat" id="statBat"><div class="n" id="nBat">--</div><div class="batbar" id="batbar"></div><div class="l">Battery</div></div>
+</div>
+<div class="keys" data-ui id="keys"><kbd>Drag</kbd> spin <kbd>Scroll</kbd> zoom <kbd>V</kbd> view <kbd>C</kbd> camera <kbd>R</kbd> reset <kbd>T</kbd> tricks <kbd>Y</kbd> find <kbd>Click</kbd> measure <kbd>H</kbd> hide all</div>
+
+<div class="side" data-ui id="side">
+<div class="card" id="tricks" hidden>
+  <div class="card-head collapse-head" id="tricksHead"><span class="card-title">Tricks</span><span class="toggle" id="tricksToggle">+</span></div>
+  <div class="card-body" id="tricksBody" hidden>
+    <div class="tgrid" id="tgrid"></div>
+    <div class="tmsg" id="tmsg">Make sure there is space around the dog.</div>
+  </div>
+</div>
+<div class="card" id="display">
+  <div class="card-head collapse-head" id="displayHead"><span class="card-title">Display</span><span class="toggle" id="displayToggle">+</span></div>
+  <div class="card-body" id="displayBody" hidden>
+    <div class="opts" id="opts"></div>
+    <button class="tbtn wide" id="clearMap">Clear trail and map</button>
+  </div>
+</div>
+</div>
+<button id="showUi" hidden>Show UI (H)</button>
+
+<div class="card" id="info" data-ui>
   <div class="card-head"><span class="card-title">How the robot sees</span></div>
   <div class="card-body">
     <p class="big">Every dot is a laser beam that bounced off something.</p>
@@ -140,7 +214,7 @@
   </div>
 </div>
 
-<div class="card" id="cam" title="Click to swap views">
+<div class="card" id="cam" title="Click to swap views" data-ui>
   <div class="card-head"><span class="card-title">Robot camera</span><span class="pill" id="camPill">Offline</span></div>
   <div class="frame">
     <img id="camImg" alt="">
@@ -210,6 +284,100 @@ const cloud = new THREE.Points(geom, new THREE.PointsMaterial({ size: 0.06, vert
 cloud.frustumCulled = false;
 scene.add(cloud);
 
+// ---------- map memory: everything the dog has seen, in full colour ----------
+// Spots seen in MEM_VOTES scans join the map and keep their height colour. The
+// map is kept up to date: a remembered spot inside the area the dog is scanning
+// right now that hasn't been seen for MEM_STALE_MS (2 s) is removed (it moved away).
+// Spots outside the current scan area are kept, so the room builds up.
+const MEM_MAX = 400000, MEM_VOTES = 5, MEM_STALE_MS = 2000, MEM_MARGIN = 0.3;
+let memoryOn = true;
+const memPos = new Float32Array(MEM_MAX * 3), memCol = new Float32Array(MEM_MAX * 3);
+const memKey = new Float64Array(MEM_MAX), memSeen = new Float64Array(MEM_MAX);
+const memGeom = new THREE.BufferGeometry();
+memGeom.setAttribute('position', new THREE.BufferAttribute(memPos, 3).setUsage(THREE.DynamicDrawUsage));
+memGeom.setAttribute('color', new THREE.BufferAttribute(memCol, 3).setUsage(THREE.DynamicDrawUsage));
+memGeom.setDrawRange(0, 0);
+const memory = new THREE.Points(memGeom, new THREE.PointsMaterial({ size: 0.06, vertexColors: true, sizeAttenuation: true }));
+memory.frustumCulled = false;
+scene.add(memory);
+const memIndex = new Map();   // cell key -> slot in the arrays
+const memVotes = new Map();   // cell key -> scans seen so far (walking kids don't stick)
+let memCount = 0, lastSweep = 0;
+
+function memRemove(i) {        // swap the last slot into slot i
+  memIndex.delete(memKey[i]);
+  const last = --memCount;
+  if (i !== last) {
+    memPos[i * 3] = memPos[last * 3]; memPos[i * 3 + 1] = memPos[last * 3 + 1]; memPos[i * 3 + 2] = memPos[last * 3 + 2];
+    memCol[i * 3] = memCol[last * 3]; memCol[i * 3 + 1] = memCol[last * 3 + 1]; memCol[i * 3 + 2] = memCol[last * 3 + 2];
+    memKey[i] = memKey[last]; memSeen[i] = memSeen[last];
+    memIndex.set(memKey[i], i);
+  }
+}
+function addToMemory(n) {
+  const now = performance.now();
+  if (memVotes.size > 600000) memVotes.clear();
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, changed = false;
+  for (let i = 0; i < n; i++) {
+    const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+    if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+    const k = cellKey(x, y, z);
+    const slot = memIndex.get(k);
+    if (slot !== undefined) { memSeen[slot] = now; continue; }
+    if (memCount >= MEM_MAX) continue;
+    const v = (memVotes.get(k) || 0) + 1;
+    if (v < MEM_VOTES) { memVotes.set(k, v); continue; }
+    memVotes.delete(k);
+    const j = memCount++;
+    memIndex.set(k, j); memKey[j] = k; memSeen[j] = now;
+    memPos[j * 3] = x; memPos[j * 3 + 1] = y; memPos[j * 3 + 2] = z;
+    const c = BAND_RGB[bandOf(z)];
+    memCol[j * 3] = c.r; memCol[j * 3 + 1] = c.g; memCol[j * 3 + 2] = c.b;
+    changed = true;
+  }
+  // about once a second, drop remembered spots in the scanned area that have gone
+  if (n > 0 && now - lastSweep > 1000) {
+    lastSweep = now;
+    minX += MEM_MARGIN; maxX -= MEM_MARGIN; minY += MEM_MARGIN; maxY -= MEM_MARGIN;
+    for (let i = memCount - 1; i >= 0; i--) {
+      if (now - memSeen[i] < MEM_STALE_MS) continue;
+      const x = memPos[i * 3], y = memPos[i * 3 + 1];
+      if (x > minX && x < maxX && y > minY && y < maxY) { memRemove(i); changed = true; }
+    }
+  }
+  if (changed) {
+    memGeom.setDrawRange(0, memCount);
+    memGeom.attributes.position.needsUpdate = true;
+    memGeom.attributes.color.needsUpdate = true;
+  }
+}
+
+// ---------- trail: square paw prints where the dog has walked ----------
+const PAW_MAX = 3000, PAW_STEP = 0.25;
+const paws = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.09, 0.09),
+  new THREE.MeshBasicMaterial({ color: '#ff6b35', side: THREE.DoubleSide }), PAW_MAX);
+paws.count = 0; paws.frustumCulled = false;
+scene.add(paws);
+const pawM = new THREE.Matrix4(), pawQ = new THREE.Quaternion(), pawS = new THREE.Vector3(1, 1, 1), pawP = new THREE.Vector3();
+const zAxis = new THREE.Vector3(0, 0, 1);
+let lastPaw = null, pawSide = 1, pawIdx = 0;
+function addPawPrint(pos, yaw) {
+  if (lastPaw && Math.hypot(pos.x - lastPaw.x, pos.y - lastPaw.y) < PAW_STEP) return;
+  lastPaw = { x: pos.x, y: pos.y };
+  pawSide = -pawSide;                    // alternate left / right
+  pawP.set(pos.x - Math.sin(yaw) * 0.1 * pawSide, pos.y + Math.cos(yaw) * 0.1 * pawSide, pos.z + 0.01);
+  pawQ.setFromAxisAngle(zAxis, yaw);
+  pawM.compose(pawP, pawQ, pawS);
+  paws.setMatrixAt(pawIdx, pawM);        // ring buffer: oldest prints get replaced
+  pawIdx = (pawIdx + 1) % PAW_MAX;
+  paws.count = Math.min(paws.count + 1, PAW_MAX);
+  paws.instanceMatrix.needsUpdate = true;
+}
+function clearTrailAndMap() {
+  memIndex.clear(); memVotes.clear(); memCount = 0; memGeom.setDrawRange(0, 0);
+  paws.count = 0; pawIdx = 0; lastPaw = null;
+}
+
 // ---------- robot dog marker (flat shapes) ----------
 const robot = new THREE.Group();
 const flat = c => new THREE.MeshBasicMaterial({ color: c });
@@ -236,6 +404,48 @@ resetView();
 let lastSeq = -1, pointCount = 0, firstFrame = true;
 const targetPos = new THREE.Vector3(); let targetYaw = 0;
 
+// ---------- find yourself: highlight voxels that only just appeared ----------
+// Every dot sits on a 5 cm grid. We remember when each grid cell was first and
+// last seen; cells that appeared in the last NEW_MS are "new" (something moved
+// there). Cells not seen for FORGET_MS are forgotten so they count as new again.
+const NEW_MS = 1500, FORGET_MS = 8000, WARMUP_MS = 3000, CELL = 0.05;
+const firstSeen = new Map(), lastSeen = new Map();
+let findMode = false, findStart = 0, lastPrune = 0;
+const WHITE = new THREE.Color('#ffffff'), DIM = 0.3;
+function cellKey(x, y, z) {
+  return (Math.round(x / CELL) + 4096) * 33554432 + (Math.round(y / CELL) + 4096) * 4096 + (Math.round(z / CELL) + 2048);
+}
+function colorPoints(n) {
+  const now = performance.now();
+  const warm = now - findStart > WARMUP_MS;     // skip the first scans (everything is "new")
+  for (let i = 0; i < n; i++) {
+    const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+    const band = BAND_RGB[bandOf(z)];
+    if (!findMode) { colors[i * 3] = band.r; colors[i * 3 + 1] = band.g; colors[i * 3 + 2] = band.b; continue; }
+    const k = cellKey(x, y, z);
+    let f0 = firstSeen.get(k);
+    if (f0 === undefined) { f0 = now; firstSeen.set(k, now); }
+    lastSeen.set(k, now);
+    if (warm && now - f0 < NEW_MS) {
+      colors[i * 3] = WHITE.r; colors[i * 3 + 1] = WHITE.g; colors[i * 3 + 2] = WHITE.b;
+    } else {
+      colors[i * 3] = band.r * DIM; colors[i * 3 + 1] = band.g * DIM; colors[i * 3 + 2] = band.b * DIM;
+    }
+  }
+  if (findMode && now - lastPrune > 2000) {
+    lastPrune = now;
+    for (const [k, t] of lastSeen) if (now - t > FORGET_MS) { lastSeen.delete(k); firstSeen.delete(k); }
+  }
+}
+const findBtn = document.getElementById('findBtn'), findNote = document.getElementById('findNote');
+function setFind(on) {
+  findMode = on; findStart = performance.now(); firstSeen.clear(); lastSeen.clear();
+  findBtn.classList.toggle('on', on); findNote.hidden = !on;
+  memory.material.color.setScalar(on ? DIM : 1);   // dim the remembered map too
+  colorPoints(pointCount); geom.attributes.color.needsUpdate = true;
+}
+findBtn.addEventListener('click', () => setFind(!findMode));
+
 async function pollFrame() {
   try {
     const r = await fetch('/frame', { cache: 'no-store' });
@@ -247,10 +457,9 @@ async function pollFrame() {
       const n = Math.min(f[0] | 0, MAX);
       targetPos.set(f[1], f[2], f[3] - 0.3); targetYaw = f[4];
       positions.set(f.subarray(5, 5 + n * 3));
-      for (let i = 0; i < n; i++) {
-        const c = BAND_RGB[bandOf(positions[i * 3 + 2])];
-        colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
-      }
+      colorPoints(n);
+      addToMemory(n);
+      if (poseLive) addPawPrint(targetPos, targetYaw);
       geom.setDrawRange(0, n);
       geom.attributes.position.addUpdateRange(0, n * 3); geom.attributes.position.needsUpdate = true;
       geom.attributes.color.addUpdateRange(0, n * 3); geom.attributes.color.needsUpdate = true;
@@ -278,10 +487,12 @@ async function pollStatus() {
     if (s.status === 'connected' && s.stale) { cls = 'connecting'; text = 'Connected, waiting for laser data'; }
     statusEl.className = 'status ' + cls; statusText.textContent = text;
     nPoints.textContent = pointCount.toLocaleString();
-    nRate.textContent = s.fps.toFixed(1);
+    nRate.textContent = (s.stale ? 0 : s.fps).toFixed(1);   // don't show a frozen rate after a disconnect
     poseLive = !!s.pose; updatePovNote();
+    setBattery(s.battery);
+    if (robotConnected !== (s.status === 'connected')) { robotConnected = s.status === 'connected'; updateTrickButtons(); }
     if (s.camera !== camLive) {
-      camLive = s.camera; nocam.hidden = camLive;
+      camLive = s.camera; nocam.hidden = camLive; camImg.hidden = !camLive;   // hide the last frozen frame
       camPill.textContent = camLive ? 'Live' : 'Offline'; camPill.classList.toggle('live', camLive);
       if (camLive) startCam();
     }
@@ -315,7 +526,9 @@ document.getElementById('cam').addEventListener('click', () => { if (!document.b
 let downAt = null;
 container.addEventListener('pointerdown', e => downAt = [e.clientX, e.clientY]);
 container.addEventListener('pointerup', e => {
-  if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 5 && document.body.classList.contains('cam-big')) swap();
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) >= 5) return;   // it was a drag
+  if (document.body.classList.contains('cam-big')) swap();
+  else measureAt(e.clientX, e.clientY);
 });
 let idle;
 controls.addEventListener('start', () => { controls.autoRotate = false; clearTimeout(idle); });
@@ -325,7 +538,11 @@ window.addEventListener('keydown', e => {
   if (k === 'c') swap();
   if (k === 'r') { if (mode === 'pov') setMode('orbit'); resetView(); }
   if (k === 'v') setMode(mode === 'pov' ? 'orbit' : 'pov');
+  if (k === 't' && !tricksEl.hidden) setTricksOpen(tricksBody.hidden);
   if (k === 'f') document.documentElement.requestFullscreen?.();
+  if (k === 'y') setFind(!findMode);
+  if (k === 'h') setClean(!document.body.classList.contains('clean'));
+  if (k === 'escape') clearRuler();
 });
 
 function resize() {
@@ -334,6 +551,155 @@ function resize() {
   camera.aspect = w / h; camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(container); resize();
+
+// ---------- tricks panel ----------
+const tricksEl = document.getElementById('tricks'), tricksBody = document.getElementById('tricksBody');
+const tgrid = document.getElementById('tgrid'), tmsg = document.getElementById('tmsg');
+let robotConnected = false;
+function setTricksOpen(open) {
+  tricksBody.hidden = !open; tricksEl.classList.toggle('open', open);
+  document.getElementById('tricksToggle').textContent = open ? '\u2212' : '+';
+}
+document.getElementById('tricksHead').addEventListener('click', () => setTricksOpen(tricksBody.hidden));
+function updateTrickButtons() {
+  tgrid.querySelectorAll('.tbtn').forEach(b => b.disabled = !robotConnected);
+}
+async function sendTrick(key, label, btn) {
+  tmsg.className = 'tmsg'; tmsg.textContent = 'Sending ' + label + '...';
+  try {
+    const r = await fetch('/trick', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ trick: key }) });
+    const j = await r.json();
+    if (j.ok) {
+      tmsg.textContent = label + (key === 'stop' ? ': stopped.' : ': go!');
+      btn.classList.add('sent'); setTimeout(() => btn.classList.remove('sent'), 1200);
+    } else { tmsg.className = 'tmsg err'; tmsg.textContent = label + ': ' + j.error; }
+  } catch (e) { tmsg.className = 'tmsg err'; tmsg.textContent = 'Could not reach the viewer program'; }
+}
+fetch('/tricks').then(r => r.json()).then(t => {
+  if (!t.enabled) return;                  // started with --no-tricks
+  tricksEl.hidden = false;
+  for (const { key, label } of t.tricks) {
+    const b = document.createElement('button');
+    b.className = 'tbtn' + (key === 'stop' ? ' stop' : ''); b.textContent = label;
+    b.addEventListener('click', () => sendTrick(key, label, b));
+    tgrid.appendChild(b);
+  }
+  updateTrickButtons();
+}).catch(() => {});
+
+// ---------- distance ruler: click a dot to see how far it is from the dog ----------
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2(), hit = new THREE.Vector3(), lidarAt = new THREE.Vector3(), tmpV = new THREE.Vector3();
+const rulerMat = flat('#ff6b35');
+const rulerBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1, 8), rulerMat);
+const rulerDot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), rulerMat);
+rulerBeam.visible = rulerDot.visible = false;
+scene.add(rulerBeam, rulerDot);
+const rulerEl = document.getElementById('ruler');
+const rulerD = document.getElementById('rulerD'), rulerC = document.getElementById('rulerC'), rulerH = document.getElementById('rulerH');
+const HEIGHT_WORDS = ['on the floor', 'ankle high', 'knee high', 'waist high', 'chest high', 'head high'];
+let rulerOn = false, rulerTimer;
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+function measureAt(cx, cy) {
+  if (!pointCount) return;
+  const r = view.getBoundingClientRect();
+  ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  raycaster.params.Points.threshold = Math.max(0.05, camera.position.distanceTo(controls.target) * 0.012);
+  geom.computeBoundingSphere();
+  const hits = raycaster.intersectObject(cloud);
+  if (!hits.length) { clearRuler(); return; }
+  hit.fromBufferAttribute(geom.attributes.position, hits[0].index);   // snap to the actual dot
+  rulerOn = true; rulerBeam.visible = rulerDot.visible = true; rulerEl.hidden = false;
+  rulerDot.position.copy(hit);
+  clearTimeout(rulerTimer); rulerTimer = setTimeout(clearRuler, 30000);
+  updateRulerText();
+}
+function clearRuler() {
+  rulerOn = false; rulerBeam.visible = rulerDot.visible = false; rulerEl.hidden = true;
+}
+function updateRulerText() {
+  lidarAt.set(robot.position.x, robot.position.y, robot.position.z + 0.45);
+  const d = lidarAt.distanceTo(hit);
+  const rulers = Math.max(1, Math.round(d / 0.3)), steps = Math.max(1, Math.round(d / 0.75));
+  rulerD.textContent = d.toFixed(1) + ' m away';
+  rulerC.textContent = d < 0.75 ? `About ${plural(rulers, 'school ruler', 'school rulers')}`
+                                : `About ${plural(rulers, 'school ruler', 'school rulers')} or ${plural(steps, 'big step', 'big steps')}`;
+  rulerH.textContent = HEIGHT_WORDS[bandOf(hit.z)] + ` (${hit.z.toFixed(1)} m up)`;
+}
+function updateRuler() {
+  if (!rulerOn) return;
+  // beam from the dog's laser to the dot (follows the dog if it walks)
+  lidarAt.set(robot.position.x, robot.position.y, robot.position.z + 0.45);
+  tmpV.subVectors(hit, lidarAt);
+  const len = tmpV.length();
+  rulerBeam.scale.set(1, Math.max(len, 0.001), 1);
+  rulerBeam.position.copy(lidarAt).addScaledVector(tmpV, 0.5);
+  rulerBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tmpV.normalize());
+  updateRulerText();
+  // pin the label above the dot on screen
+  tmpV.copy(hit).project(camera);
+  const behind = tmpV.z > 1;
+  rulerEl.hidden = behind;
+  if (!behind) {
+    rulerEl.style.left = Math.min(Math.max((tmpV.x + 1) / 2 * view.width, 120), view.width - 120) + 'px';
+    rulerEl.style.top = Math.max((1 - tmpV.y) / 2 * view.height, 110) + 'px';
+  }
+}
+
+// ---------- battery tile ----------
+const nBat = document.getElementById('nBat'), batbar = document.getElementById('batbar');
+batbar.innerHTML = '<i></i>'.repeat(10);
+function setBattery(pct) {
+  const blocks = batbar.children;
+  if (pct == null) { nBat.textContent = '--'; for (const b of blocks) b.style.background = ''; return; }
+  nBat.textContent = pct + '%';
+  const col = pct < 20 ? 'var(--bad)' : pct < 50 ? 'var(--wait)' : 'var(--ok)';
+  const lit = Math.ceil(pct / 10);
+  [...blocks].forEach((b, i) => b.style.background = i < lit ? col : '');
+}
+
+// ---------- display panel: show / hide parts of the screen ----------
+const OPTIONS = [   // [id, label, default, apply(on)]
+  ['sep', 'Screen'],
+  ['topbar', 'Title bar', true, on => { el('topbar').classList.toggle('ui-off', !on); document.body.classList.toggle('no-topbar', !on); }],
+  ['counters', 'Dot counters', true, on => { el('statDots').classList.toggle('ui-off', !on); el('statRate').classList.toggle('ui-off', !on); }],
+  ['battery', 'Battery', true, on => el('statBat').classList.toggle('ui-off', !on)],
+  ['info', 'How it works card', true, on => el('info').classList.toggle('ui-off', !on)],
+  ['camera', 'Camera', true, on => el('cam').classList.toggle('ui-off', !on)],
+  ['keys', 'Keyboard hints', true, on => el('keys').classList.toggle('ui-off', !on)],
+  ['tricks', 'Tricks panel', true, on => el('tricks').classList.toggle('ui-off', !on)],
+  ['sep', '3D view'],
+  ['grid', 'Floor grid', true, on => grid.visible = on],
+  ['trail', 'Paw print trail', true, on => paws.visible = on],
+  ['memory', 'Map memory', true, on => { memoryOn = on; memory.visible = on && !document.body.classList.contains('pov'); }],
+];
+const el = id => document.getElementById(id);
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('go2-display') || '{}'); } catch (e) {}
+const optsEl = el('opts');
+for (const [id, label, def, apply] of OPTIONS) {
+  if (id === 'sep') { optsEl.insertAdjacentHTML('beforeend', `<div class="opt-sep">${label}</div>`); continue; }
+  const on = id in saved ? saved[id] : def;
+  const row = document.createElement('label'); row.className = 'opt';
+  row.innerHTML = `<span>${label}</span><input type="checkbox"${on ? ' checked' : ''}>`;
+  const box = row.querySelector('input');
+  box.addEventListener('change', () => {
+    apply(box.checked); saved[id] = box.checked;
+    try { localStorage.setItem('go2-display', JSON.stringify(saved)); } catch (e) {}
+  });
+  optsEl.appendChild(row); apply(on);
+}
+function setPanelOpen(card, body, toggle, open) {
+  el(body).hidden = !open; el(card).classList.toggle('open', open); el(toggle).textContent = open ? '\u2212' : '+';
+}
+el('displayHead').addEventListener('click', () => setPanelOpen('display', 'displayBody', 'displayToggle', el('displayBody').hidden));
+el('clearMap').addEventListener('click', clearTrailAndMap);
+// H hides every overlay at once; the small button (or H again) brings it back
+function setClean(on) { document.body.classList.toggle('clean', on); el('showUi').hidden = !on; }
+el('showUi').addEventListener('click', () => setClean(false));
 
 // ---------- view modes: overview (orbit) / dog's eyes (POV) ----------
 const EYE_FWD = 0.35, EYE_UP = 0.45, EYE_TILT = 0.12;   // metres; tilt = drop per metre ahead
@@ -346,6 +712,8 @@ function setMode(m) {
   const pov = m === 'pov';
   controls.enabled = !pov;
   robot.visible = !pov;                 // don't draw the dog inside its own eyes
+  memory.visible = memoryOn && !pov;    // old grey dots would block the dog's view
+  document.body.classList.toggle('pov', pov);
   camera.fov = pov ? 80 : 55; camera.updateProjectionMatrix();
   cloud.material.size = pov ? 0.03 : 0.06;   // close-up dots would look like big blocks
   if (!pov) { camera.up.set(0, 0, 1); resetView(); }
@@ -377,6 +745,7 @@ renderer.setAnimationLoop(() => {
   } else {
     controls.update();
   }
+  updateRuler();
   renderer.render(scene, camera);
   vctx.drawImage(renderer.domElement, 0, 0);
 });
