@@ -18,14 +18,11 @@ shows:
 - **Front camera feed** from the robot, swappable with the 3D view
 - **Find yourself:** dots that just appeared (someone moving) turn white
   while everything else dims, so kids can wave and spot themselves
-- **Distance ruler:** click any dot to see how far it is from the dog, in
-  meters, school rulers and big steps, plus how high it is
 - **Paw print trail** of where the dog walked, and **map memory** that keeps
   everything the dog has seen in its height colours, so the room builds up as
   it walks. The map stays current: spots in the area being scanned that are
   no longer there are removed, and people walking past don't leave ghosts
-- **Minimap:** top-down map (north up) with the dog's heading, paw trail and
-  measured spots; zoom it, or enlarge it
+- **Minimap:** top-down map (north up) with the dog's heading and paw trail; zoom it, or enlarge it
 - **Battery gauge**, dot count and scan rate
 - **Display panel** to show or hide any part of the screen (saved between
   visits), and **H** to hide everything except the 3D view
@@ -55,7 +52,6 @@ Other devices on the same network can watch at `http://<pi-ip>:8080`.
 | **R** | Reset to the overview |
 | **T** or click "Tricks" | Open / close the tricks panel |
 | **Y** or "Find yourself" | Highlight things that just moved |
-| Click a dot | Measure its distance from the dog (**Esc** clears) |
 | **H** | Hide / show all on-screen panels |
 | **M** | Show / hide the minimap |
 | Click / scroll the map | Zoom the minimap |
@@ -119,15 +115,16 @@ change `impersonate="chrome120"` to `impersonate="safari17_0"`.
 
 ```
 Go2 ──WebRTC──> go2lidar.py ──HTTP──> browser (web/index.html)
-                 │ decodes LiDAR voxel map        │ three.js point cloud
-                 │ JPEG-encodes camera frames     │ polls /frame, /status
-                 └ serves /frame /status /camera.mjpg
+     <──tricks──   │ decodes LiDAR, pose, battery    │ three.js point cloud
+                   │ JPEG-encodes camera frames      │ polls /frame, /status
+                   └ serves /frame /status            └ POST /trick
+                     /camera.mjpg /tricks
 ```
 
 | File | Purpose |
 |---|---|
-| `go2lidar.py` | Connects to the robot, decodes LiDAR and pose, encodes video, serves the page |
-| `web/index.html` | The viewer: three.js scene, overview and POV modes, UI |
+| `go2lidar.py` | Connects to the robot, decodes LiDAR, pose and battery, encodes video, sends tricks, serves the page |
+| `web/index.html` | The viewer: 3D scene, overview and POV, find yourself, map memory, minimap, panels |
 | `web/vendor/` | Bundled three.js r160 and OrbitControls (MIT) |
 | `run.sh` | Starts the server |
 
@@ -140,4 +137,6 @@ to a visible 2D canvas.
 - Status stays yellow: check the Pi is on the robot's Wi-Fi and the phone app
   is closed. Run `.venv/bin/python go2lidar.py -v` for detailed logs.
 - "Robot needs its AES key": see the AES key section above.
+- Battery shows "--": the server logs one `battery data:` line after
+  connecting that shows what the robot sent.
 - Script errors are shown in a red box on the page.
