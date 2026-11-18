@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What the Robot Dog Sees</title>
+<style>
+  :root {
+    --bg: #121418;        /* charcoal */
+    --bar: #191c21;
+    --panel: #1d2026;
+    --edge: #2e323b;
+    --ink: #f3efe7;       /* warm white */
+    --muted: #9a958c;
+    --accent: #ff6b35;    /* signal orange */
+    --ok: #2ec27e;
+    --wait: #f5c211;
+    --bad: #e5484d;
+    --gap: 24px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font-family: "Inter", "Segoe UI", Ubuntu, Roboto, system-ui, sans-serif; }
+
+  /* ---------- layout ---------- */
+  #scene { position: fixed; inset: 72px 0 0 0; background: var(--bg); touch-action: none; }
+  #scene canvas { display: block; }
+
+  .topbar { position: fixed; top: 0; left: 0; right: 0; height: 72px; padding: 0 var(--gap);
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: var(--bar); border-bottom: 1px solid var(--edge); z-index: 10; }
+  .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .mark { width: 14px; height: 36px; background: var(--accent); border-radius: 0; flex: none; }
+  h1 { margin: 0; font-size: clamp(22px, 2.4vw, 34px); font-weight: 750; letter-spacing: -0.3px; white-space: nowrap; }
+  h1 em { font-style: normal; color: var(--accent); }
+
+  .status { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 0;
+    background: var(--panel); border: 1px solid var(--edge); font-size: clamp(13px, 1.1vw, 16px);
+    font-weight: 600; white-space: nowrap; }
+  .status .dot { width: 10px; height: 10px; border-radius: 0; background: var(--wait); }
+  .status.connected .dot { background: var(--ok); }
+  .status.connecting .dot { animation: blink 1.2s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+
+  .seg { display: flex; border: 1px solid var(--edge); background: var(--panel); }
+  .seg button { font: 600 clamp(13px, 1.1vw, 16px) inherit; font-family: inherit; color: var(--muted);
+    background: transparent; border: 0; padding: 9px 16px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--edge); }
+  .seg button.on { background: var(--accent); color: #121418; }
+  .right { display: flex; align-items: center; gap: 12px; }
+  .povnote { position: fixed; left: 50%; top: 96px; transform: translateX(-50%); z-index: 8;
+    background: var(--panel); border: 1px solid var(--wait); color: var(--ink); padding: 10px 16px;
+    font-size: clamp(14px, 1.2vw, 18px); font-weight: 600; }
+  .card { position: fixed; background: var(--panel); border: 1px solid var(--edge); border-radius: 0; z-index: 6; }
+  .card-head { padding: 12px 16px; border-bottom: 1px solid var(--edge); display: flex;
+    align-items: center; justify-content: space-between; gap: 12px; }
+  .card-title { font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+  .card-body { padding: 16px; }
+
+  /* ---------- info card (left) ---------- */
+  #info { left: var(--gap); bottom: var(--gap); width: min(40vw, 520px); }
+  .big { margin: 0 0 14px; font-size: clamp(18px, 1.7vw, 26px); font-weight: 700; line-height: 1.25; }
+  .key { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .key div { height: 14px; border-radius: 0; }
+  .key-labels { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 6px;
+    color: var(--muted); font-size: clamp(11px, 0.9vw, 13px); }
+  .fact { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--edge);
+    font-size: clamp(15px, 1.3vw, 19px); line-height: 1.4; min-height: 3.4em; transition: opacity .4s; }
+  .fact b { color: var(--accent); font-weight: 700; margin-right: 6px; }
+
+  /* ---------- camera card (right) ---------- */
+  #cam { right: var(--gap); bottom: var(--gap); width: min(36vw, 640px); overflow: hidden; cursor: pointer; }
+  #cam .frame { position: relative; aspect-ratio: 16 / 9; background: #000; }
+  #cam img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+  #cam .nocam { position: absolute; inset: 0; display: grid; place-items: center;
+    color: var(--muted); font-size: clamp(14px, 1.2vw, 18px); }
+  .pill { font-size: 12px; font-weight: 600; color: var(--muted); padding: 3px 8px; border-radius: 0;
+    border: 1px solid var(--edge); }
+  .pill.live { color: #121418; background: var(--bad); border-color: var(--bad); }
+
+  /* camera-big mode: camera fills the main area, 3D view moves into the card slot */
+  body.cam-big #cam { left: 0; right: 0; top: 72px; bottom: 0; width: auto; border-radius: 0; border: 0; }
+  body.cam-big #cam .frame { aspect-ratio: auto; height: calc(100% - 49px); }
+  body.cam-big #scene { inset: auto var(--gap) var(--gap) auto; width: min(36vw, 640px);
+    height: calc(min(36vw, 640px) * 9 / 16); z-index: 7; border: 1px solid var(--edge);
+    border-radius: 0; overflow: hidden; cursor: pointer; }
+
+  .stats { position: fixed; left: var(--gap); top: 88px; z-index: 6; display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat { background: var(--panel); border: 1px solid var(--edge); border-radius: 0; padding: 8px 12px; }
+  .stat .n { font-size: clamp(18px, 1.6vw, 24px); font-weight: 750; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+  .keys { position: fixed; right: var(--gap); top: 88px; z-index: 6; display: flex; gap: 6px;
+    color: var(--muted); font-size: 12px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  kbd { font: 600 11px ui-monospace, monospace; color: var(--ink); background: var(--panel);
+    border: 1px solid var(--edge); border-radius: 0; padding: 2px 6px; }
+
+  #err { position: fixed; top: 160px; left: var(--gap); right: var(--gap); padding: 10px 12px; background: #3a1517;
+    border: 1px solid var(--bad); color: #fff; font: 13px ui-monospace, monospace; border-radius: 0; z-index: 20;
+    white-space: pre-wrap; }
+
+  @media (max-width: 900px) {
+    #info { width: calc(100vw - 2 * var(--gap)); bottom: auto; top: 160px; }
+    #cam { width: calc(100vw - 2 * var(--gap)); }
+    .keys { display: none; }
+  }
+</style>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="scene"></div>
+
+<div class="topbar">
+  <div class="brand"><div class="mark"></div><h1>What the <em>Robot Dog</em> Sees</h1></div>
+  <div class="right">
+    <div class="seg" id="viewSeg">
+      <button data-mode="orbit" class="on">Overview</button><button data-mode="pov">Dog's eyes</button>
+    </div>
+    <div class="status connecting" id="status"><div class="dot"></div><span id="statusText">Starting</span></div>
+  </div>
+</div>
+<div class="povnote" id="povNote" hidden>Waiting for the dog's position. Showing the view from where it started.</div>
+
+<div class="stats">
+  <div class="stat"><div class="n" id="nPoints">0</div><div class="l">Laser dots</div></div>
+  <div class="stat"><div class="n" id="nRate">0</div><div class="l">Scans / sec</div></div>
+</div>
+<div class="keys"><kbd>Drag</kbd> spin <kbd>Scroll</kbd> zoom <kbd>V</kbd> view <kbd>C</kbd> camera <kbd>R</kbd> reset</div>
+
+<div class="card" id="info">
+  <div class="card-head"><span class="card-title">How the robot sees</span></div>
+  <div class="card-body">
+    <p class="big">Every dot is a laser beam that bounced off something.</p>
+    <div class="key" id="key"></div>
+    <div class="key-labels"><span>Floor</span><span>Ankle</span><span>Knee</span><span>Waist</span><span>Chest</span><span>Head</span></div>
+    <div class="fact" id="fact"></div>
+  </div>
+</div>
+
+<div class="card" id="cam" title="Click to swap views">
+  <div class="card-head"><span class="card-title">Robot camera</span><span class="pill" id="camPill">Offline</span></div>
+  <div class="frame">
+    <img id="camImg" alt="">
+    <div class="nocam" id="nocam">Waiting for camera</div>
+  </div>
+</div>
+
+<div id="err" hidden></div>
+<script>
+// Show script errors on screen (handy when there's no keyboard/devtools at the event).
+function showErr(m) { const e = document.getElementById('err'); e.hidden = false; e.textContent += m + '\n'; }
+window.addEventListener('error', ev => showErr('Error: ' + ev.message));
+window.addEventListener('unhandledrejection', ev => showErr('Error: ' + ev.reason));
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './vendor/OrbitControls.js';
+
+// ---------- height bands: flat colours, used for both the dots and the key ----------
+const BANDS = [            // [top of band in metres, colour]
+  [0.15, '#3b6ff5'],       // floor
+  [0.40, '#17b3b3'],       // ankle
+  [0.70, '#69c34d'],       // knee
+  [1.10, '#f5c211'],       // waist
+  [1.50, '#f28a30'],       // chest
+  [99,   '#e8434f'],       // head and above
+];
+document.getElementById('key').innerHTML = BANDS.map(([, c]) => `<div style="background:${c}"></div>`).join('');
+const BAND_RGB = BANDS.map(([, c]) => new THREE.Color(c));   // three converts sRGB → linear for us
+function bandOf(z) { for (let i = 0; i < BANDS.length; i++) if (z < BANDS[i][0]) return i; return BANDS.length - 1; }
+
+// ---------- scene (Z is "up", matching the robot) ----------
+const container = document.getElementById('scene');
+// three.js draws into an off-screen WebGL canvas; each finished frame is copied
+// onto a visible 2D canvas. (Firefox on the Pi renders WebGL fine but never puts
+// a WebGL canvas on screen; 2D canvases display reliably.)
+const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+const view = document.createElement('canvas');
+const vctx = view.getContext('2d', { alpha: false });
+container.appendChild(view);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#121418');
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 200);
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, view);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.5;
+controls.maxPolarAngle = Math.PI * 0.49;    // don't go under the floor
+controls.minDistance = 2; controls.maxDistance = 40;
+
+const grid = new THREE.GridHelper(30, 30, 0x3a3f4a, 0x23262d);
+grid.rotation.x = Math.PI / 2;
+scene.add(grid);
+
+// ---------- point cloud ----------
+const MAX = 200000;
+const positions = new Float32Array(MAX * 3);
+const colors = new Float32Array(MAX * 3);
+const geom = new THREE.BufferGeometry();
+geom.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+geom.setAttribute('color', new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage));
+geom.setDrawRange(0, 0);
+const cloud = new THREE.Points(geom, new THREE.PointsMaterial({ size: 0.06, vertexColors: true, sizeAttenuation: true }));
+cloud.frustumCulled = false;
+scene.add(cloud);
+
+// ---------- robot dog marker (flat shapes) ----------
+const robot = new THREE.Group();
+const flat = c => new THREE.MeshBasicMaterial({ color: c });
+const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.16), flat('#f3efe7')); body.position.z = 0.38;
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.16), flat('#ff6b35')); head.position.set(0.42, 0, 0.44);
+robot.add(body, head);
+for (const [x, y] of [[0.25, 0.13], [0.25, -0.13], [-0.25, 0.13], [-0.25, -0.13]]) {
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.3), flat('#9a958c'));
+  leg.position.set(x, y, 0.15); robot.add(leg);
+}
+const ringMat = new THREE.MeshBasicMaterial({ color: '#ff6b35', transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.54, 64), ringMat);
+ring.position.z = 0.02; robot.add(ring);
+scene.add(robot);
+
+function resetView() {
+  camera.position.set(robot.position.x - 6, robot.position.y - 6, 5);
+  controls.target.set(robot.position.x, robot.position.y, robot.position.z + 0.3);
+  controls.autoRotate = true;
+}
+resetView();
+
+// ---------- data polling ----------
+let lastSeq = -1, pointCount = 0, firstFrame = true;
+const targetPos = new THREE.Vector3(); let targetYaw = 0;
+
+async function pollFrame() {
+  try {
+    const r = await fetch('/frame', { cache: 'no-store' });
+    const seq = Number(r.headers.get('X-Seq'));
+    const buf = await r.arrayBuffer();
+    if (seq !== lastSeq && buf.byteLength >= 20) {
+      lastSeq = seq;
+      const f = new Float32Array(buf);
+      const n = Math.min(f[0] | 0, MAX);
+      targetPos.set(f[1], f[2], f[3] - 0.3); targetYaw = f[4];
+      positions.set(f.subarray(5, 5 + n * 3));
+      for (let i = 0; i < n; i++) {
+        const c = BAND_RGB[bandOf(positions[i * 3 + 2])];
+        colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+      }
+      geom.setDrawRange(0, n);
+      geom.attributes.position.addUpdateRange(0, n * 3); geom.attributes.position.needsUpdate = true;
+      geom.attributes.color.addUpdateRange(0, n * 3); geom.attributes.color.needsUpdate = true;
+      pointCount = n;
+      if (firstFrame && n > 0) { firstFrame = false; robot.position.copy(targetPos); robot.rotation.z = targetYaw; resetView(); }
+    }
+  } catch (e) { /* server restarting; try again */ }
+  setTimeout(pollFrame, 80);
+}
+pollFrame();
+
+// ---------- status + camera ----------
+const statusEl = document.getElementById('status'), statusText = document.getElementById('statusText');
+const nPoints = document.getElementById('nPoints'), nRate = document.getElementById('nRate');
+const nocam = document.getElementById('nocam'), camImg = document.getElementById('camImg'), camPill = document.getElementById('camPill');
+let camLive = false;
+function startCam() { camImg.src = '/camera.mjpg?t=' + Date.now(); }
+startCam();
+camImg.addEventListener('error', () => setTimeout(startCam, 2000));
+
+async function pollStatus() {
+  try {
+    const s = await (await fetch('/status', { cache: 'no-store' })).json();
+    let cls = s.status, text = s.message;
+    if (s.status === 'connected' && s.stale) { cls = 'connecting'; text = 'Connected, waiting for laser data'; }
+    statusEl.className = 'status ' + cls; statusText.textContent = text;
+    nPoints.textContent = pointCount.toLocaleString();
+    nRate.textContent = s.fps.toFixed(1);
+    poseLive = !!s.pose; updatePovNote();
+    if (s.camera !== camLive) {
+      camLive = s.camera; nocam.hidden = camLive;
+      camPill.textContent = camLive ? 'Live' : 'Offline'; camPill.classList.toggle('live', camLive);
+      if (camLive) startCam();
+    }
+  } catch (e) {
+    statusEl.className = 'status connecting'; statusText.textContent = 'Viewer program not running';
+  }
+  setTimeout(pollStatus, 1000);
+}
+pollStatus();
+
+// ---------- facts ----------
+const FACTS = [
+  'The robot spins a laser and times how long the light takes to bounce back.',
+  'Light is so fast it could circle the Earth 7 times in one second.',
+  'Bats and dolphins do the same thing with sound. It is called echolocation.',
+  'Blue dots are on the floor. Red dots are as high as a grown-up\'s head.',
+  'Wave at the robot dog. Can you find yourself in the dots?',
+  'Self-driving cars use LiDAR too, so they do not bump into things.',
+  'The dog uses this map to walk around chairs, boxes and people.',
+];
+let fi = 0; const factEl = document.getElementById('fact');
+function nextFact() {
+  factEl.style.opacity = 0;
+  setTimeout(() => { factEl.innerHTML = '<b>Did you know?</b>' + FACTS[fi++ % FACTS.length]; factEl.style.opacity = 1; }, 400);
+}
+nextFact(); setInterval(nextFact, 9000);
+
+// ---------- interaction ----------
+function swap() { document.body.classList.toggle('cam-big'); resize(); }
+document.getElementById('cam').addEventListener('click', () => { if (!document.body.classList.contains('cam-big')) swap(); });
+let downAt = null;
+container.addEventListener('pointerdown', e => downAt = [e.clientX, e.clientY]);
+container.addEventListener('pointerup', e => {
+  if (downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) < 5 && document.body.classList.contains('cam-big')) swap();
+});
+let idle;
+controls.addEventListener('start', () => { controls.autoRotate = false; clearTimeout(idle); });
+controls.addEventListener('end', () => { idle = setTimeout(() => controls.autoRotate = true, 15000); });
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'c') swap();
+  if (k === 'r') { if (mode === 'pov') setMode('orbit'); resetView(); }
+  if (k === 'v') setMode(mode === 'pov' ? 'orbit' : 'pov');
+  if (k === 'f') document.documentElement.requestFullscreen?.();
+});
+
+function resize() {
+  const w = container.clientWidth, h = container.clientHeight;
+  renderer.setSize(w, h, false); view.width = w; view.height = h;
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(container); resize();
+
+// ---------- view modes: overview (orbit) / dog's eyes (POV) ----------
+const EYE_FWD = 0.35, EYE_UP = 0.45, EYE_TILT = 0.12;   // metres; tilt = drop per metre ahead
+const eye = new THREE.Vector3();
+let mode = 'orbit', poseLive = false;
+const povNote = document.getElementById('povNote');
+function updatePovNote() { povNote.hidden = !(mode === 'pov' && !poseLive && pointCount > 0); }
+function setMode(m) {
+  mode = m;
+  const pov = m === 'pov';
+  controls.enabled = !pov;
+  robot.visible = !pov;                 // don't draw the dog inside its own eyes
+  camera.fov = pov ? 80 : 55; camera.updateProjectionMatrix();
+  cloud.material.size = pov ? 0.03 : 0.06;   // close-up dots would look like big blocks
+  if (!pov) { camera.up.set(0, 0, 1); resetView(); }
+  document.querySelectorAll('#viewSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  updatePovNote();
+}
+document.querySelectorAll('#viewSeg button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+// ---------- render loop ----------
+const clock = new THREE.Clock();
+const before = new THREE.Vector3(), moved = new THREE.Vector3();
+renderer.setAnimationLoop(() => {
+  const t = clock.getElapsedTime();
+  // glide the dog marker toward its newest pose; keep the view centred on it
+  before.copy(robot.position);
+  robot.position.lerp(targetPos, 0.15);
+  let dy = targetYaw - robot.rotation.z; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  robot.rotation.z += dy * 0.15;
+  moved.subVectors(robot.position, before);
+  camera.position.add(moved); controls.target.add(moved);
+  const ph = (t * 0.6) % 1;
+  ring.scale.setScalar(1 + ph * 3); ringMat.opacity = 0.6 * (1 - ph);
+  if (mode === 'pov') {
+    // eye at the dog's head, looking where the dog faces, tilted slightly down
+    const c = Math.cos(robot.rotation.z), s = Math.sin(robot.rotation.z);
+    eye.set(robot.position.x + EYE_FWD * c, robot.position.y + EYE_FWD * s, robot.position.z + EYE_UP);
+    camera.position.copy(eye);
+    camera.lookAt(eye.x + c, eye.y + s, eye.z - EYE_TILT);
+  } else {
+    controls.update();
+  }
+  renderer.render(scene, camera);
+  vctx.drawImage(renderer.domElement, 0, 0);
+});
+</script>
+</body>
+</html>

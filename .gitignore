@@ -1,0 +1,10 @@
+# secrets
+aes_key.txt
+
+# environment / caches
+.venv/
+__pycache__/
+*.pyc
+
+# logs
+*.log
